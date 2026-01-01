@@ -24,8 +24,8 @@ speech-to-text/
 ├── windows-client/            # Windows push-to-talk client
 │   ├── client.py              # Main client application
 │   ├── config.json            # Client configuration
-│   ├── requirements.txt
-│   └── start_client.bat       # Easy startup script
+│   ├── build.bat              # Build standalone executable
+│   └── requirements.txt
 ├── docker-compose.yml         # Container orchestration
 ├── test_api.py               # API test script
 ├── .gitignore
@@ -87,74 +87,32 @@ You should see all tests pass:
   Transcription: [PASS]
 ```
 
-### Step 4: Install Client Dependencies
-
-```powershell
-cd windows-client
-pip install -r requirements.txt
-```
-
-**Note**: If you get errors installing PyAudio, you may need to install it separately:
-```powershell
-pip install pipwin
-pipwin install pyaudio
-```
-
-### Step 5: Run the Client
-
-Double-click `start_client.bat` in the `windows-client` folder, or run:
-
-```powershell
-python client.py
-```
-
-## Building a Standalone Executable
-
-Instead of running the Python client directly, you can build a standalone executable that doesn't require Python to be installed.
-
-### Using build.bat
-
-Navigate to the `windows-client` folder and double-click `build.bat`, or run:
+### Step 4: Build the Client
 
 ```powershell
 cd windows-client
 .\build.bat
 ```
 
-The build script will:
-1. Create a virtual environment
-2. Install all dependencies
-3. Install PyInstaller
-4. Build an executable (`speech-to-text-client.exe`)
-5. Copy the configuration file to the distribution folder
-6. Clean up temporary build files
+This creates a standalone executable at `windows-client/dist/speech-to-text-client.exe`.
 
-Once complete, you'll find:
-- **Executable**: `windows-client/dist/speech-to-text-client.exe`
-- **Config**: `windows-client/dist/config.json`
+### Step 5: Run the Client
 
-### Running the Executable
-
-Navigate to the dist folder and run:
+Run the executable:
 
 ```powershell
-cd windows-client\dist
-.\speech-to-text-client.exe
+.\dist\speech-to-text-client.exe
 ```
 
-Or from the windows-client folder:
+The client runs in the system tray. You'll see an icon appear when it's running.
 
-```powershell
-dist\speech-to-text-client.exe
-```
-
-### Distributing the Executable
+## Distributing the Client
 
 The `windows-client/dist` folder contains everything needed to run the client on another Windows machine without Python installed:
-- `speech-to-text-client.exe` - The executable
+- `speech-to-text-client.exe` - The standalone executable
 - `config.json` - Configuration file
 
-Simply copy these files to another machine and run the executable.
+Simply copy these two files to another machine and run the executable.
 
 ## Usage
 
@@ -164,8 +122,7 @@ Simply copy these files to another machine and run the executable.
    ```
 
 2. **Start the client**:
-   - Double-click `windows-client/start_client.bat`
-   - Or run `python windows-client/client.py`
+   - Run `windows-client/dist/speech-to-text-client.exe`
 
 3. **Record speech**:
    - Hold **Ctrl+Shift+Space** (default hotkey)
