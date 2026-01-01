@@ -536,16 +536,18 @@ class PushToTalkApp:
         hotkey = self.config['hotkey']
 
         # Register hotkey handlers
+        # suppress=True prevents the key from being passed to other applications
+        # This stops F13 from outputting escape sequences like [25~ in terminals
         try:
             keyboard.on_press_key(
                 hotkey.split('+')[-1],  # Get the main key
                 lambda e: self._check_hotkey_press(),
-                suppress=False
+                suppress=True
             )
             keyboard.on_release_key(
                 hotkey.split('+')[-1],
                 lambda e: self._check_hotkey_release(),
-                suppress=False
+                suppress=True
             )
         except Exception as e:
             # Fallback: use keyboard.add_hotkey for the full combination
@@ -553,7 +555,7 @@ class PushToTalkApp:
             keyboard.add_hotkey(
                 hotkey,
                 self.on_hotkey_press,
-                suppress=False,
+                suppress=True,
                 trigger_on_release=False
             )
 
