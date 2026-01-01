@@ -41,9 +41,9 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: Build executable
+:: Build executable (--noconsole for background/systray operation)
 echo [4/4] Building executable...
-pyinstaller --onefile --name speech-to-text-client --icon=speech2textV3.ico client.py
+pyinstaller --onefile --noconsole --name speech-to-text-client --icon=speech2textV3.ico client.py
 if errorlevel 1 (
     echo ERROR: Build failed
     exit /b 1
