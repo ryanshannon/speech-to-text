@@ -1,35 +1,34 @@
 # Docker Compose for Speech-to-Text Server
 #
 # Usage:
-#   Start:    docker-compose up -d
-#   Stop:     docker-compose down
+#   CPU Mode:
+#     Start:    docker-compose up -d
+#     Stop:     docker-compose down
+#
+#   GPU Mode (NVIDIA):
+#     Start:    docker-compose --profile gpu up -d
+#     Stop:     docker-compose --profile gpu down
+#
 #   Logs:     docker-compose logs -f
 #   Rebuild:  docker-compose build --no-cache
 
-version: '3.8'
-
 services:
+  # CPU Version (default)
   speech-to-text:
     build:
       context: ./speech-to-text-server
       dockerfile: Dockerfile
     container_name: speech-to-text-server
+    profiles: ["", "cpu"]  # Default profile
     ports:
       - "5000:5000"
     environment:
-      # Whisper model configuration
-      # Options: tiny, base, small, medium, large-v3
-      # Larger models = better accuracy but slower and more memory
       - WHISPER_MODEL=base
-      # Device: cpu or cuda (if you have NVIDIA GPU with CUDA)
       - WHISPER_DEVICE=cpu
-      # Compute type: int8 (fastest on CPU), float16 (GPU), float32 (most accurate)
       - WHISPER_COMPUTE_TYPE=int8
     volumes:
-      # Persist the Whisper model cache to avoid re-downloading
       - whisper-cache:/home/whisper/.cache
     restart: unless-stopped
-    # Resource limits (adjust based on your system)
     deploy:
       resources:
         limits:
@@ -42,6 +41,37 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
+  # GPU Version (NVIDIA CUDA)
+  speech-to-text-gpu:
+    build:
+      context: ./speech-to-text-server
+      dockerfile: Dockerfile.gpu
+    container_name: speech-to-text-server
+    profiles: ["gpu"]
+    ports:
+      - "5000:5000"
+    environment:
+      # Use larger model with GPU - it's fast enough
+      - WHISPER_MODEL=base
+      - WHISPER_DEVICE=cuda
+      - WHISPER_COMPUTE_TYPE=float16
+    volumes:
+      - whisper-cache:/home/whisper/.cache
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 
 volumes:
   whisper-cache:

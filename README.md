@@ -10,13 +10,15 @@ A fully local, privacy-focused speech-to-text system using OpenAI's Whisper mode
 - **Easy Setup**: Docker container handles all dependencies
 - **Clipboard Integration**: Transcriptions are automatically copied to clipboard
 - **Configurable**: Change hotkeys, model size, and audio settings
+- **GPU Accelerated**: Optional NVIDIA CUDA support for faster transcription
 
 ## Project Structure
 
 ```
 speech-to-text/
 ├── speech-to-text-server/     # Docker container with Whisper
-│   ├── Dockerfile
+│   ├── Dockerfile             # CPU version
+│   ├── Dockerfile.gpu         # GPU/CUDA version
 │   ├── app.py                 # Flask API server
 │   └── requirements.txt
 ├── windows-client/            # Windows push-to-talk client
@@ -218,6 +220,86 @@ docker-compose restart
 docker-compose ps
 ```
 
+## GPU Acceleration (NVIDIA CUDA)
+
+If you have an NVIDIA GPU, you can use CUDA acceleration for significantly faster transcription.
+
+### GPU Prerequisites
+
+1. **NVIDIA GPU** with CUDA support (GTX 1060 or better recommended)
+2. **NVIDIA Drivers** installed (version 525+ recommended)
+3. **NVIDIA Container Toolkit** installed
+
+### Installing NVIDIA Container Toolkit on Windows
+
+1. Make sure you have the latest NVIDIA drivers installed
+2. In Docker Desktop, go to Settings → Resources → WSL Integration
+3. Enable integration with your WSL2 distro
+4. Install the NVIDIA Container Toolkit in WSL2:
+
+```bash
+# Run these commands in WSL2 (Ubuntu)
+distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
+curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+
+sudo apt-get update
+sudo apt-get install -y nvidia-container-toolkit
+sudo systemctl restart docker
+```
+
+5. Verify GPU is accessible:
+```powershell
+docker run --rm --gpus all nvidia/cuda:12.1.1-base-ubuntu22.04 nvidia-smi
+```
+
+### Running with GPU
+
+Build and start the GPU version:
+
+```powershell
+docker-compose --profile gpu up -d
+```
+
+Stop the GPU version:
+
+```powershell
+docker-compose --profile gpu down
+```
+
+Rebuild GPU image:
+
+```powershell
+docker-compose --profile gpu build --no-cache
+```
+
+### GPU vs CPU Comparison
+
+| Aspect | CPU | GPU |
+|--------|-----|-----|
+| `base` model | ~2-4 sec | ~0.3-0.5 sec |
+| `small` model | ~5-10 sec | ~0.5-1 sec |
+| `medium` model | ~15-30 sec | ~1-2 sec |
+| `large-v3` model | ~30-60 sec | ~2-4 sec |
+| Memory usage | System RAM | GPU VRAM |
+| First startup | ~30 sec | ~60 sec |
+
+*Times are approximate for a 10-second audio clip*
+
+### Switching Between CPU and GPU
+
+Only one version can run at a time (they use the same port):
+
+```powershell
+# Stop CPU version, start GPU version
+docker-compose down
+docker-compose --profile gpu up -d
+
+# Stop GPU version, start CPU version
+docker-compose --profile gpu down
+docker-compose up -d
+```
+
 ## Troubleshooting
 
 ### "Cannot connect to server"
@@ -254,10 +336,11 @@ https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
 
 ### Transcription is slow
 
-1. Upgrade to a faster model isn't always better - try `tiny` or `base` first
-2. Ensure Docker has enough RAM (4GB+ recommended)
-3. Check CPU usage - close other heavy applications
-4. If you have an NVIDIA GPU, consider using CUDA (advanced setup)
+1. **Use GPU acceleration** if you have an NVIDIA GPU - see GPU section above
+2. Try a smaller model - `tiny` or `base` are fastest
+3. Ensure Docker has enough RAM (4GB+ recommended)
+4. Check CPU usage - close other heavy applications
+5. Keep recordings short - shorter audio processes faster
 
 ### Container keeps restarting
 
@@ -269,6 +352,17 @@ docker-compose logs speech-to-text
 Common issues:
 - Not enough memory: Increase Docker memory limit in Docker Desktop settings
 - Port conflict: Another application using port 5000
+
+### GPU not detected / CUDA errors
+
+1. Verify NVIDIA drivers are installed: `nvidia-smi` in PowerShell
+2. Verify Docker can see GPU:
+   ```powershell
+   docker run --rm --gpus all nvidia/cuda:12.1.1-base-ubuntu22.04 nvidia-smi
+   ```
+3. Check NVIDIA Container Toolkit is installed in WSL2
+4. Restart Docker Desktop after installing toolkit
+5. Check GPU memory - close other GPU-intensive applications
 
 ## Performance Tips
 

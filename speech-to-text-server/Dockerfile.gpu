@@ -1,13 +1,25 @@
-# Speech-to-Text Server Dockerfile
-# Uses faster-whisper for efficient speech recognition
+# Speech-to-Text Server Dockerfile (GPU/CUDA Version)
+# Uses faster-whisper with NVIDIA CUDA acceleration
+#
+# Requirements:
+#   - NVIDIA GPU with CUDA support
+#   - NVIDIA Container Toolkit installed
+#   - Docker configured to use nvidia runtime
 
-FROM python:3.11-slim
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies required for audio processing and building PyAV
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install Python and system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-dev \
+    python3.11-venv \
+    python3-pip \
     ffmpeg \
     libsndfile1 \
     pkg-config \
@@ -21,11 +33,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
+# Make python3.11 the default python
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+
+# Upgrade pip
+RUN python -m pip install --upgrade pip
+
 # Copy requirements first for better Docker layer caching
 COPY requirements.txt .
 
-# Install Python dependencies
+# Install Python dependencies with CUDA support
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Install cuBLAS and cuDNN for faster-whisper GPU support
+RUN pip install --no-cache-dir nvidia-cublas-cu12 nvidia-cudnn-cu12
 
 # Copy application code
 COPY app.py .
@@ -40,20 +62,18 @@ RUN mkdir -p /home/whisper/.cache && \
 
 USER whisper
 
-# Environment variables (can be overridden at runtime)
+# Environment variables for GPU mode
 ENV WHISPER_MODEL=base
-ENV WHISPER_DEVICE=cpu
-ENV WHISPER_COMPUTE_TYPE=int8
+ENV WHISPER_DEVICE=cuda
+ENV WHISPER_COMPUTE_TYPE=float16
 ENV PYTHONUNBUFFERED=1
 
 # Expose the API port
 EXPOSE 5000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')" || exit 1
 
 # Run with gunicorn for production
-# Using 1 worker because the model is memory-intensive
-# Timeout set high for first request (model loading)
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--timeout", "120", "app:app"]
