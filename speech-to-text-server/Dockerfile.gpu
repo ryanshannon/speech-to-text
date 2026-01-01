@@ -67,6 +67,8 @@ ENV WHISPER_MODEL=base
 ENV WHISPER_DEVICE=cuda
 ENV WHISPER_COMPUTE_TYPE=float16
 ENV PYTHONUNBUFFERED=1
+# Add pip-installed CUDA libraries to library path (cuDNN 9 from nvidia-cudnn-cu12)
+ENV LD_LIBRARY_PATH=/usr/local/lib/python3.11/dist-packages/nvidia/cudnn/lib:/usr/local/lib/python3.11/dist-packages/nvidia/cublas/lib:${LD_LIBRARY_PATH}
 
 # Expose the API port
 EXPOSE 5000

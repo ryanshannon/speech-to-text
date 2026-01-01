@@ -3,7 +3,7 @@ flask==3.0.0
 werkzeug==3.0.1
 
 # Faster-whisper for speech recognition
-faster-whisper==1.0.1
+faster-whisper==1.1.0
 
 # Audio processing
 pydub==0.25.1
@@ -13,3 +13,6 @@ flask-cors==4.0.0
 
 # Production WSGI server
 gunicorn==21.2.0
+
+# HTTP library (required by faster-whisper)
+requests>=2.28.0
