@@ -1,5 +1,5 @@
 {
-  "hotkey": "ctrl+shift+space",
+  "hotkey": "F13",
   "api_url": "http://localhost:5000",
   "audio": {
     "sample_rate": 16000,

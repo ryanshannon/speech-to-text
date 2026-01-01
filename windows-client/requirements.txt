@@ -10,8 +10,5 @@ requests==2.31.0
 # Clipboard access on Windows
 pyperclip==1.8.2
 
-# Audio file handling
-wave
-
-# Configuration loading (included with Python, but listed for clarity)
-# json - standard library
+# Audio file handling (wave is part of Python standard library - no install needed)
+# Configuration loading (json is also standard library)

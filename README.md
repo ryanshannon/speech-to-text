@@ -108,6 +108,54 @@ Double-click `start_client.bat` in the `windows-client` folder, or run:
 python client.py
 ```
 
+## Building a Standalone Executable
+
+Instead of running the Python client directly, you can build a standalone executable that doesn't require Python to be installed.
+
+### Using build.bat
+
+Navigate to the `windows-client` folder and double-click `build.bat`, or run:
+
+```powershell
+cd windows-client
+.\build.bat
+```
+
+The build script will:
+1. Create a virtual environment
+2. Install all dependencies
+3. Install PyInstaller
+4. Build an executable (`speech-to-text-client.exe`)
+5. Copy the configuration file to the distribution folder
+6. Clean up temporary build files
+
+Once complete, you'll find:
+- **Executable**: `windows-client/dist/speech-to-text-client.exe`
+- **Config**: `windows-client/dist/config.json`
+
+### Running the Executable
+
+Navigate to the dist folder and run:
+
+```powershell
+cd windows-client\dist
+.\speech-to-text-client.exe
+```
+
+Or from the windows-client folder:
+
+```powershell
+dist\speech-to-text-client.exe
+```
+
+### Distributing the Executable
+
+The `windows-client/dist` folder contains everything needed to run the client on another Windows machine without Python installed:
+- `speech-to-text-client.exe` - The executable
+- `config.json` - Configuration file
+
+Simply copy these files to another machine and run the executable.
+
 ## Usage
 
 1. **Start the server** (if not already running):
