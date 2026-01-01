@@ -243,16 +243,18 @@ class TranscriptionClient:
         self.api_url = config['api_url']
         self.session = requests.Session()
 
-    def check_server(self) -> bool:
-        """Check if the server is available."""
+    def check_server(self) -> dict | None:
+        """Check if the server is available and return health info."""
         try:
             response = self.session.get(
                 f"{self.api_url}/health",
                 timeout=5
             )
-            return response.status_code == 200
+            if response.status_code == 200:
+                return response.json()
+            return None
         except requests.RequestException:
-            return False
+            return None
 
     def transcribe(self, audio_filepath: str) -> dict:
         """
@@ -308,6 +310,7 @@ class SystrayManager:
         self.app = app
         self.icon = None
         self.current_status = "idle"
+        self.server_info = None  # Health endpoint data: model, device, compute_type
         self._create_icon()
 
     def _create_image(self, color):
@@ -364,6 +367,11 @@ class SystrayManager:
                 enabled=False
             ),
             pystray.MenuItem(
+                lambda item: self._get_server_status_text(),
+                None,
+                enabled=False
+            ),
+            pystray.MenuItem(
                 lambda item: f"Hotkey: {self.app.config['hotkey'].upper()}",
                 None,
                 enabled=False
@@ -403,6 +411,15 @@ class SystrayManager:
         }
         return status_map.get(self.current_status, "Unknown")
 
+    def _get_server_status_text(self):
+        """Get server status text from health endpoint data."""
+        if not self.server_info:
+            return "Server: Disconnected"
+        model = self.server_info.get('model', '?')
+        device = self.server_info.get('device', '?')
+        compute = self.server_info.get('compute_type', '?')
+        return f"Server: {model} ({device}, {compute})"
+
     def _on_exit(self, icon, item):
         """Handle exit menu item."""
         logger.info("Exit requested from systray")
@@ -421,9 +438,13 @@ class SystrayManager:
         """Handle stop server menu item."""
         self.app.stop_docker_server()
 
-    def set_status(self, status):
+    def set_status(self, status, server_info=None):
         """Update the icon status and appearance."""
         self.current_status = status
+        if server_info is not None:
+            self.server_info = server_info
+        elif status == "idle":
+            self.server_info = None  # Clear server info when disconnected
 
         color_map = {
             "idle": self.COLOR_IDLE,
@@ -440,6 +461,8 @@ class SystrayManager:
             # Update tooltip
             tooltip = f"Speech-to-Text - {self._get_status_text()}"
             self.icon.title = tooltip
+            # Force menu to re-evaluate lambda functions
+            self.icon.update_menu()
 
     def run(self):
         """Run the systray icon (blocking)."""
@@ -477,10 +500,11 @@ class PushToTalkApp:
 
     def check_server_connection(self) -> bool:
         """Check if server is running and update status."""
-        if self.client.check_server():
+        server_info = self.client.check_server()
+        if server_info:
             if self.systray.current_status == "idle":
                 logger.info("Server connected")
-            self.systray.set_status("ready")
+            self.systray.set_status("ready", server_info)
             return True
         else:
             if self.systray.current_status == "ready":
