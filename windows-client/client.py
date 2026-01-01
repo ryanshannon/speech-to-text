@@ -350,13 +350,18 @@ class PushToTalkApp:
                     if text:
                         print(f"\n[TRANSCRIPTION]\n{text}\n")
 
-                        # Copy to clipboard if enabled
+                        # Copy to clipboard and paste if enabled
                         if self.config.get('copy_to_clipboard', True):
                             try:
                                 pyperclip.copy(text)
                                 print("[CLIPBOARD] Text copied!")
+                                # Small delay to ensure clipboard is ready
+                                time.sleep(0.05)
+                                # Paste into current cursor position
+                                keyboard.send('ctrl+v')
+                                print("[PASTE] Text pasted!")
                             except Exception as e:
-                                print(f"[WARNING] Could not copy to clipboard: {e}")
+                                print(f"[WARNING] Could not copy/paste: {e}")
                     else:
                         print("[WARNING] No speech detected")
 
