@@ -1,0 +1,15 @@
+# Flask web framework
+flask==3.0.0
+werkzeug==3.0.1
+
+# Faster-whisper for speech recognition
+faster-whisper==1.0.1
+
+# Audio processing
+pydub==0.25.1
+
+# CORS support for API
+flask-cors==4.0.0
+
+# Production WSGI server
+gunicorn==21.2.0

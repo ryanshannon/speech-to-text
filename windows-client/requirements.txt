@@ -1,0 +1,17 @@
+# Audio capture
+PyAudio==0.2.14
+
+# Keyboard hotkey detection
+keyboard==0.13.5
+
+# HTTP requests to API
+requests==2.31.0
+
+# Clipboard access on Windows
+pyperclip==1.8.2
+
+# Audio file handling
+wave
+
+# Configuration loading (included with Python, but listed for clarity)
+# json - standard library

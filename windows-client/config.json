@@ -1,0 +1,13 @@
+{
+  "hotkey": "ctrl+shift+space",
+  "api_url": "http://localhost:5000",
+  "audio": {
+    "sample_rate": 16000,
+    "channels": 1,
+    "chunk_size": 1024,
+    "format": "int16"
+  },
+  "language": null,
+  "copy_to_clipboard": true,
+  "show_notifications": true
+}
