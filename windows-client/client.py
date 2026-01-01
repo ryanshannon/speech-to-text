@@ -36,6 +36,8 @@ import logging
 import time
 from pathlib import Path
 
+import subprocess
+
 import pyaudio
 import keyboard
 import requests
@@ -43,10 +45,21 @@ import pyperclip
 import pystray
 from PIL import Image, ImageDraw
 
-# Configure logging
+# Configure logging - write to both console and file
+# Use exe directory if frozen, otherwise script directory
+if getattr(sys, 'frozen', False):
+    _app_dir = Path(sys.executable).parent
+else:
+    _app_dir = Path(__file__).parent
+log_file = _app_dir / "client.log"
+
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(log_file, mode='w', encoding='utf-8')
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -65,7 +78,10 @@ class Config:
         },
         "language": None,  # Auto-detect
         "copy_to_clipboard": True,
-        "show_notifications": True
+        "show_notifications": True,
+        "auto_start_server": False,
+        "docker_compose_path": None,  # Path to directory containing docker-compose.yml
+        "server_profile": "cpu"  # "cpu" or "gpu"
     }
 
     def __init__(self, config_path: str = None):
@@ -354,6 +370,17 @@ class SystrayManager:
             ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
+                "Start Server",
+                self._on_start_server,
+                visible=lambda item: self._can_control_server()
+            ),
+            pystray.MenuItem(
+                "Stop Server",
+                self._on_stop_server,
+                visible=lambda item: self._can_control_server()
+            ),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(
                 "Exit",
                 self._on_exit
             )
@@ -381,6 +408,18 @@ class SystrayManager:
         logger.info("Exit requested from systray")
         self.app.running = False
         self.stop()
+
+    def _can_control_server(self):
+        """Check if server control is configured."""
+        return bool(self.app.config.get('docker_compose_path'))
+
+    def _on_start_server(self, icon, item):
+        """Handle start server menu item."""
+        self.app.start_docker_server()
+
+    def _on_stop_server(self, icon, item):
+        """Handle stop server menu item."""
+        self.app.stop_docker_server()
 
     def set_status(self, status):
         """Update the icon status and appearance."""
@@ -437,18 +476,137 @@ class PushToTalkApp:
         self.systray = SystrayManager(self)
 
     def check_server_connection(self) -> bool:
-        """Verify server is running."""
-        logger.info("Checking server connection...")
+        """Check if server is running and update status."""
         if self.client.check_server():
-            logger.info("Server connection OK")
+            if self.systray.current_status == "idle":
+                logger.info("Server connected")
             self.systray.set_status("ready")
             return True
         else:
-            logger.error("Cannot connect to speech-to-text server!")
-            logger.error("Make sure Docker container is running: docker-compose up -d")
-            logger.error(f"Expected server at: {self.config['api_url']}")
+            if self.systray.current_status == "ready":
+                logger.warning("Server disconnected")
             self.systray.set_status("idle")
             return False
+
+    def _try_docker_commands(self, commands: list, cwd: Path):
+        """Try a list of docker commands, return first successful result."""
+        # Hide console window on Windows
+        startupinfo = None
+        creationflags = 0
+        if sys.platform == 'win32':
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            creationflags = subprocess.CREATE_NO_WINDOW
+
+        last_result = None
+        for cmd in commands:
+            try:
+                logger.info(f"Running: {' '.join(cmd)}")
+                result = subprocess.run(
+                    cmd,
+                    cwd=str(cwd),
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                    startupinfo=startupinfo,
+                    creationflags=creationflags
+                )
+                last_result = result
+                # Log command output
+                if result.stdout.strip():
+                    logger.info(f"stdout: {result.stdout.strip()}")
+                if result.stderr.strip():
+                    logger.info(f"stderr: {result.stderr.strip()}")
+                if result.returncode == 0:
+                    return result
+                logger.warning(f"Command failed (exit {result.returncode})")
+            except FileNotFoundError:
+                logger.warning(f"Command not found: {cmd[0]}")
+                continue
+            except Exception as e:
+                logger.error(f"Command error: {e}")
+                continue
+        return last_result
+
+    def start_docker_server(self):
+        """Start the Docker server (non-blocking, runs in background thread)."""
+        def _start():
+            compose_path = self.config.get('docker_compose_path')
+            if not compose_path:
+                logger.error("docker_compose_path not configured")
+                return
+
+            compose_dir = Path(compose_path)
+            if not (compose_dir / "docker-compose.yml").exists():
+                logger.error(f"docker-compose.yml not found in {compose_path}")
+                return
+
+            profile = self.config.get('server_profile', 'cpu')
+            logger.info(f"Starting Docker server ({profile} mode)...")
+
+            if profile == 'gpu':
+                down_commands = [
+                    ["docker", "compose", "--profile", "gpu", "down"],
+                    ["docker-compose", "--profile", "gpu", "down"],
+                ]
+                up_commands = [
+                    ["docker", "compose", "--profile", "gpu", "up", "-d"],
+                    ["docker-compose", "--profile", "gpu", "up", "-d"],
+                ]
+            else:
+                down_commands = [
+                    ["docker", "compose", "down"],
+                    ["docker-compose", "down"],
+                ]
+                up_commands = [
+                    ["docker", "compose", "up", "-d"],
+                    ["docker-compose", "up", "-d"],
+                ]
+
+            # Clean up any orphaned containers first
+            logger.info("Cleaning up old containers...")
+            self._try_docker_commands(down_commands, compose_dir)
+
+            # Now start fresh
+            result = self._try_docker_commands(up_commands, compose_dir)
+            if result and result.returncode == 0:
+                logger.info("Docker server started")
+            else:
+                error_msg = result.stderr.strip() if result else "No docker command found"
+                logger.error(f"Failed to start server: {error_msg}")
+
+        threading.Thread(target=_start, daemon=True).start()
+
+    def stop_docker_server(self):
+        """Stop the Docker server (non-blocking, runs in background thread)."""
+        def _stop():
+            compose_path = self.config.get('docker_compose_path')
+            if not compose_path:
+                logger.error("docker_compose_path not configured")
+                return
+
+            compose_dir = Path(compose_path)
+            profile = self.config.get('server_profile', 'cpu')
+            logger.info("Stopping Docker server...")
+
+            if profile == 'gpu':
+                commands = [
+                    ["docker", "compose", "--profile", "gpu", "stop"],
+                    ["docker-compose", "--profile", "gpu", "stop"],
+                ]
+            else:
+                commands = [
+                    ["docker", "compose", "stop"],
+                    ["docker-compose", "stop"],
+                ]
+
+            result = self._try_docker_commands(commands, compose_dir)
+            if result and result.returncode == 0:
+                logger.info("Server stopped")
+            else:
+                logger.error("Failed to stop server")
+
+        threading.Thread(target=_stop, daemon=True).start()
 
     def on_hotkey_press(self):
         """Called when hotkey is pressed - start recording."""
@@ -573,20 +731,28 @@ class PushToTalkApp:
                 logger.debug(f"Hotkey check error: {e}")
                 time.sleep(0.1)
 
+    def _health_check_loop(self):
+        """Background thread to periodically check server status."""
+        while self.running:
+            try:
+                self.check_server_connection()
+            except Exception as e:
+                logger.debug(f"Health check error: {e}")
+            time.sleep(5)  # Check every 5 seconds
+
     def run(self):
         """Main application loop."""
-        # Check server connection
-        if not self.check_server_connection():
-            logger.warning("Server not available - will retry when hotkey is pressed")
-
         hotkey = self.config['hotkey']
         logger.info(f"Hotkey: {hotkey.upper()}")
         logger.info("Hold the hotkey and speak, then release to transcribe.")
         logger.info("Right-click the system tray icon to exit.")
 
-        # Start hotkey listener in background thread
-        hotkey_thread = threading.Thread(target=self._hotkey_loop, daemon=True)
-        hotkey_thread.start()
+        # Initial server check (non-blocking)
+        self.check_server_connection()
+
+        # Start background threads
+        threading.Thread(target=self._hotkey_loop, daemon=True).start()
+        threading.Thread(target=self._health_check_loop, daemon=True).start()
 
         # Run systray in main thread (blocking)
         try:

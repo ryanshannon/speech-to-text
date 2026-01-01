@@ -163,6 +163,28 @@ Edit `windows-client/config.json` to customize:
 | `channels` | Audio channels (1=mono) | `1` |
 | `language` | Force language (e.g., "en"), or null for auto-detect | `null` |
 | `copy_to_clipboard` | Auto-copy transcription to clipboard | `true` |
+| `auto_start_server` | Automatically start Docker server if not running | `false` |
+| `docker_compose_path` | Path to directory containing docker-compose.yml | `null` |
+| `server_profile` | Docker profile to use: "cpu" or "gpu" | `"cpu"` |
+
+### Auto-Starting the Server
+
+The client can automatically start the Docker server if it's not running. Enable this by setting:
+
+```json
+{
+  "auto_start_server": true,
+  "docker_compose_path": "C:/path/to/speech-to-text",
+  "server_profile": "cpu"
+}
+```
+
+When enabled, the client will:
+1. Check if the server is reachable
+2. If not, run `docker-compose up -d` in the specified directory
+3. Wait up to 90 seconds for the server to become healthy
+
+**Note**: Docker Desktop must be running for this to work.
 
 ### Changing the Hotkey
 

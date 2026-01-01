@@ -82,6 +82,9 @@ python test_api.py
 - `api_url`: Server URL (default: "http://localhost:5000")
 - `audio`: sample_rate, channels, chunk_size, format
 - `copy_to_clipboard`: Auto-copy transcription
+- `auto_start_server`: Start Docker if server unreachable (default: false)
+- `docker_compose_path`: Path to docker-compose.yml directory
+- `server_profile`: "cpu" or "gpu"
 
 ## Important Patterns
 

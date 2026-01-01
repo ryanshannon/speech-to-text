@@ -9,5 +9,8 @@
   },
   "language": null,
   "copy_to_clipboard": true,
-  "show_notifications": true
+  "show_notifications": true,
+  "auto_start_server": true,
+  "docker_compose_path": "C:/Users/rshan/dev/speech-to-text",
+  "server_profile": "gpu"
 }
